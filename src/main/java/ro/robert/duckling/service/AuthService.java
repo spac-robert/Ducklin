@@ -5,6 +5,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ro.robert.duckling.dto.RegisterRequest;
+import ro.robert.duckling.exception.SpringDucklinException;
 import ro.robert.duckling.model.NotificationEmail;
 import ro.robert.duckling.model.User;
 import ro.robert.duckling.model.VerificationToken;
@@ -12,6 +13,7 @@ import ro.robert.duckling.repository.UserRepository;
 import ro.robert.duckling.repository.VerificationTokenRepository;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -23,7 +25,7 @@ public class AuthService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final MailService mailService;
 
-    @Transactional
+    //@Transactional
     public void signup(RegisterRequest request) {
         User user = new User();
         user.setUsername(request.getUsername());
@@ -49,5 +51,21 @@ public class AuthService {
 
         verificationTokenRepository.save(verificationToken);
         return token;
+    }
+
+    public void verifyAccount(String token) {
+        Optional<VerificationToken> verificationToken = verificationTokenRepository.findByToken(token);
+        verificationToken.orElseThrow(() -> new SpringDucklinException("invalid Token"));
+        fetchUserAndEnable(verificationToken.get());
+    }
+
+
+    //@Transactional
+    void fetchUserAndEnable(VerificationToken token) {
+        String username = token.getUser().getUsername();
+        User user = userRepository.findUserByUsername(username)
+                .orElseThrow(() -> new SpringDucklinException("User " + username + " not found"));
+        user.setEnabled(true);
+        userRepository.save(user);
     }
 }
